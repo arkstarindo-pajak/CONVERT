@@ -1,4 +1,4 @@
-import csv
+csv
 import io
 import pandas as pd
 import streamlit as st
@@ -9,10 +9,11 @@ st.set_page_config(
 
 st.title('📊 Aplikasi Konversi e-Faktur & Data Barang')
 st.write(
-    'Muat naik fail CSV e-Faktur (`Data 1`) dan fail rujukan (`DATA BARANG`) di bawah untuk memproses penukaran kod, satuan, dan harga.'
+    'Muat naik fail CSV e-Faktur (`Data 1`) dan fail rujukan (`DATA BARANG`) di'
+    ' bawah untuk memproses penukaran kod, satuan, dan harga.'
 )
 
-# Bahagian muat naik fail (File Uploader)
+# Bahagian muat naik fail
 uploaded_csv = st.file_uploader(
     '1. Muat naik Fail CSV e-Faktur (Data 1)', type=['csv']
 )
@@ -24,7 +25,7 @@ if uploaded_csv is not None and uploaded_excel is not None:
   if st.button('Proses Data'):
     with st.spinner('Sedang memproses data... Sila tunggu sebentar.'):
       try:
-        # Baca fail rujukan DATA BARANG dari muat naik
+        # Baca fail rujukan DATA BARANG (menggunakan enjin openpyxl atau calamine)
         df_barang = pd.read_excel(uploaded_excel, sheet_name=0)
 
         barang_dict = {}
@@ -34,8 +35,7 @@ if uploaded_csv is not None and uploaded_excel is not None:
           karton = float(row['SATUAN PER KARTON'])
           barang_dict[nama] = {'KODE': kode, 'KARTON': karton}
 
-        # Baca fail CSV e-Faktur dari muat naik
-        # Streamlit file uploader mengembalikan bytes, jadi kita decode ke string
+        # Baca fail CSV e-Faktur
         stringio = io.StringIO(uploaded_csv.getvalue().decode('latin1'))
         reader = csv.reader(stringio)
 
@@ -51,17 +51,31 @@ if uploaded_csv is not None and uploaded_excel is not None:
           if jenis_baris == 'FK':
             faktur_header = row
           elif jenis_baris == 'OF':
+            # Pastikan ia bukan baris tajuk (header) teks di dalam CSV
+            if row[1] == 'KODE_OBJEK' or row[3] == 'HARGA_SATUAN':
+              continue
+
             if faktur_header:
               kode_objek_lama = row[1]
               nama_barang = row[2].strip()
-              harga_satuan_lama = float(row[3])
-              jumlah_barang_lama = float(row[4])
-              harga_total = float(row[5])
-              diskon = float(row[6]) if row[6] else 0.0
-              dpp = float(row[7]) if row[7] else 0.0
-              ppn = float(row[8]) if row[8] else 0.0
-              tarif_ppnbm = row[9]
-              ppnbm = row[10] if len(row) > 10 and row[10] else 0.0
+
+              try:
+                harga_satuan_lama = float(row[3])
+                jumlah_barang_lama = float(row[4])
+                harga_total = float(row[5])
+                diskon = float(row[6]) if row[6] and row[6] != 'None' else 0.0
+                dpp = float(row[7]) if row[7] and row[7] != 'None' else 0.0
+                ppn = float(row[8]) if row[8] and row[8] != 'None' else 0.0
+              except ValueError:
+                # Langkau baris jika gagal ditukar ke angka
+                continue
+
+              tarif_ppnbm = row[9] if len(row) > 9 else '0'
+              ppnbm = (
+                  float(row[10])
+                  if len(row) > 10 and row[10] and row[10] != 'None'
+                  else 0.0
+              )
 
               # Semak padanan nama barang
               if nama_barang in barang_dict:
@@ -71,7 +85,7 @@ if uploaded_csv is not None and uploaded_excel is not None:
                 kode_baru = kode_objek_lama
                 satuan_karton = 1
 
-              # Peraturan harga > 120,000
+              # Peraturan harga > 120,000 dikonversi dari karton ke pcs
               if harga_satuan_lama > 120000 and satuan_karton > 0:
                 harga_satuan_baru = harga_satuan_lama / satuan_karton
                 jumlah_barang_baru = jumlah_barang_lama * satuan_karton
@@ -96,7 +110,7 @@ if uploaded_csv is not None and uploaded_excel is not None:
               gabungan_row = faktur_header + row_baru_of
               gabungan_data.append(gabungan_row)
 
-        # Buat fail Excel dalam memori (BytesIO)
+        # Buat fail Excel dalam memori untuk dimuat turun
         output = io.BytesIO()
         df_output = pd.DataFrame(gabungan_data)
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -105,7 +119,6 @@ if uploaded_csv is not None and uploaded_excel is not None:
 
         st.success('Proses konversi berjaya dilakukan!')
 
-        # Butang muat turun hasil
         st.download_button(
             label='📥 Muat Turun Fail Excel Hasil',
             data=processed_data,
