@@ -1,4 +1,4 @@
-csv
+import csv
 import io
 import pandas as pd
 import streamlit as st
@@ -25,7 +25,7 @@ if uploaded_csv is not None and uploaded_excel is not None:
   if st.button('Proses Data'):
     with st.spinner('Sedang memproses data... Sila tunggu sebentar.'):
       try:
-        # Baca fail rujukan DATA BARANG (menggunakan enjin openpyxl atau calamine)
+        # Baca fail rujukan DATA BARANG
         df_barang = pd.read_excel(uploaded_excel, sheet_name=0)
 
         barang_dict = {}
@@ -51,7 +51,7 @@ if uploaded_csv is not None and uploaded_excel is not None:
           if jenis_baris == 'FK':
             faktur_header = row
           elif jenis_baris == 'OF':
-            # Pastikan ia bukan baris tajuk (header) teks di dalam CSV
+            # Langkau baris tajuk (header) teks di dalam CSV
             if row[1] == 'KODE_OBJEK' or row[3] == 'HARGA_SATUAN':
               continue
 
@@ -67,7 +67,6 @@ if uploaded_csv is not None and uploaded_excel is not None:
                 dpp = float(row[7]) if row[7] and row[7] != 'None' else 0.0
                 ppn = float(row[8]) if row[8] and row[8] != 'None' else 0.0
               except ValueError:
-                # Langkau baris jika gagal ditukar ke angka
                 continue
 
               tarif_ppnbm = row[9] if len(row) > 9 else '0'
